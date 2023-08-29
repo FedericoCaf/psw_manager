@@ -8,8 +8,8 @@ import bcrypt
 from db_connection import connect_db
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev')
-app.crypto_key = os.environ.get('CRYPTO_KEY', 'dev')    
+app.secret_key = os.environ.get('SECRET_KEY')
+app.crypto_key = os.environ.get('CRYPTO_KEY') 
 db = 'psw_manager_db.db'
 cipher_suite = Fernet(app.crypto_key)
 

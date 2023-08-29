@@ -10,7 +10,7 @@
 -- );
 
 
--- DELETE FROM passwords;
+DELETE FROM passwords WHERE id > 2;
 
 -- INSERT INTO users (nome, cognome, email, username, password, data_iscrizione) VALUES (
 --    'marcorossi@gmail.com','marco92', 'marco92', '2023-01-01'
