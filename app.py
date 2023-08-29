@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template, session
+from cryptography.fernet import Fernet
 import jwt
 import bcrypt
 import datetime
@@ -8,6 +9,8 @@ from db_connection import connect_db
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'ba6d37d12387483480cd196de9e7ee59'
 db = 'psw_manager_db.db'
+key = Fernet.generate_key()
+cipher_suite = Fernet(key)
 
 #home
 @app.route("/")
@@ -114,16 +117,18 @@ def add_password():
     username_body = data['username']
     password_body = data['password']
 
+    encrypted_password = cipher_suite.encrypt(password_body.encode())
+
     conn = connect_db(db)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO passwords (user_id, context, username, password) VALUES (?, ?, ?, ?)", (user_info['id'], context_body, username_body, password_body))
+    cursor.execute("INSERT INTO passwords (user_id, context, username, password) VALUES (?, ?, ?, ?)", (user_info['id'], context_body, username_body, encrypted_password))
     conn.commit()
     return jsonify({'message': 'Password added correctly.'})
 
 #ottieni tutte le password dell'utente corrente
-@app.route('/all-passwords', methods=['GET'])
+@app.route('/all-contexts', methods=['GET'])
 @token_required
-def get_all_passwords():
+def get_all_contexts():
    
     token = session.get('token')
 
@@ -139,35 +144,37 @@ def get_all_passwords():
     cursor = conn.cursor()
     cursor.execute(f"SELECT * FROM passwords WHERE user_id = '{user_info['id']}'")
     rows = cursor.fetchall()
-    passwords_list = []
-    for row in rows:
-        password_obj = {
-            'id': row[0],
-            'user_id': row[1],
-            'context': row[2],
-            'username': row[3],
-            # 'password': row[4],
-        }
-        passwords_list.append(password_obj)
+    if len(rows):
+        passwords_list = []
+        for row in rows:
+            password_obj = {
+                'id': row[0],
+                'user_id': row[1],
+                'context': row[2],
+                'username': row[3],
+               #'password': row[4],
+             }
+            passwords_list.append(password_obj)
+            return passwords_list
+    return jsonify({'message': 'Nessun contesto salvato per l\'utente corrente'}), 400
 
-    conn.close()
-    return passwords_list
-
-#ottieni tutte le password dell'utente corrente
+#ottieni la password tramite id
 @app.route('/get-password/<int:id>', methods=['GET'])
 @token_required
 def get_password(id):
        
     conn = connect_db(db)
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM passwords WHERE id = {id}")
+    cursor.execute('SELECT * FROM passwords WHERE id = ?', (id,))
     row = cursor.fetchone()
-    password_obj = {
-        'password': row[4],
-        }
-
-    conn.close()
-    return password_obj
+    if row:
+        decrypted_password = cipher_suite.decrypt(row[4]).decode()
+        password_obj = {
+            'password': decrypted_password,
+            }
+        conn.close()
+        return password_obj
+    return jsonify({'message': 'User password not found'}), 400
 
 #logout
 @app.route('/logout', methods=['POST'])
