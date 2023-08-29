@@ -90,7 +90,7 @@ def login():
 def protected():
     return jsonify({'message': 'Protected route. Access allowed.'})
 
-#rotta protetta da autenticazione
+#aggiungi password contesto
 @app.route('/add-password', methods=['POST'])
 @token_required
 def add_password():
@@ -120,35 +120,54 @@ def add_password():
     conn.commit()
     return jsonify({'message': 'Password added correctly.'})
 
-#rotta protetta da autenticazione
-@app.route('/get-all-passwords', methods=['POST'])
+#ottieni tutte le password dell'utente corrente
+@app.route('/all-passwords', methods=['GET'])
 @token_required
 def get_all_passwords():
    
-    data = request.get_json()
-    if not data['context'] or not data['username'] or not data['password']:
-        return jsonify({'message': 'Mandatory data missing'}), 400
-
     token = session.get('token')
 
-    if token:
-        try:
-            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            user_info = payload['user']     
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired!'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'message': 'Token is invalid!'}), 401
-        
-    context_body = data['context']
-    username_body = data['username']
-    password_body = data['password']
-
+    try:
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        user_info = payload['user']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'message': 'Token has expired!'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'message': 'Token is invalid!'}), 401
+    
     conn = connect_db(db)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO passwords (user_id, context, username, password) VALUES (?, ?, ?, ?)", (user_info['id'], context_body, username_body, password_body))
-    conn.commit()
-    return jsonify({'message': 'Password added correctly.'})
+    cursor.execute(f"SELECT * FROM passwords WHERE user_id = '{user_info['id']}'")
+    rows = cursor.fetchall()
+    passwords_list = []
+    for row in rows:
+        password_obj = {
+            'id': row[0],
+            'user_id': row[1],
+            'context': row[2],
+            'username': row[3],
+            # 'password': row[4],
+        }
+        passwords_list.append(password_obj)
+
+    conn.close()
+    return passwords_list
+
+#ottieni tutte le password dell'utente corrente
+@app.route('/get-password/<int:id>', methods=['GET'])
+@token_required
+def get_password(id):
+       
+    conn = connect_db(db)
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT * FROM passwords WHERE id = {id}")
+    row = cursor.fetchone()
+    password_obj = {
+        'password': row[4],
+        }
+
+    conn.close()
+    return password_obj
 
 #logout
 @app.route('/logout', methods=['POST'])
