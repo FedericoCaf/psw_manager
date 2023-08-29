@@ -1,16 +1,17 @@
+import os
+import datetime
+from functools import wraps
 from flask import Flask, request, jsonify, render_template, session
 from cryptography.fernet import Fernet
 import jwt
 import bcrypt
-import datetime
-from functools import wraps
 from db_connection import connect_db
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'ba6d37d12387483480cd196de9e7ee59'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev')
+app.crypto_key = os.environ.get('CRYPTO_KEY', 'dev')    
 db = 'psw_manager_db.db'
-key = Fernet.generate_key()
-cipher_suite = Fernet(key)
+cipher_suite = Fernet(app.crypto_key)
 
 #home
 @app.route("/")
@@ -51,7 +52,7 @@ def token_required(f):
         if not token:
             return jsonify({'message': 'Token is missing!'}), 401
         try:
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            data = jwt.decode(token, app.secret_key, algorithms=['HS256'])
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired!'}), 401
         except jwt.InvalidTokenError:
@@ -78,7 +79,7 @@ def login():
             token = jwt.encode({
                 'user': user_db,
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
-            }, app.config['SECRET_KEY'], algorithm='HS256')
+            }, app.secret_key, algorithm='HS256')
 
             session['token'] = token
 
@@ -106,7 +107,7 @@ def add_password():
 
     if token:
         try:
-            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            payload = jwt.decode(token, app.secret_key, algorithms=['HS256'])
             user_info = payload['user']     
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired!'}), 401
@@ -116,7 +117,6 @@ def add_password():
     context_body = data['context']
     username_body = data['username']
     password_body = data['password']
-
     encrypted_password = cipher_suite.encrypt(password_body.encode())
 
     conn = connect_db(db)
@@ -133,7 +133,7 @@ def get_all_contexts():
     token = session.get('token')
 
     try:
-        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'])
         user_info = payload['user']
     except jwt.ExpiredSignatureError:
         return jsonify({'message': 'Token has expired!'}), 401
