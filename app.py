@@ -112,12 +112,6 @@ def login():
     if request.method == 'GET':
         return jsonify({'message': 'Eventuali dati per pagina di login'})
 
-#rotta protetta da autenticazione
-@app.route('/protected', methods=['GET'])
-@token_required
-def protected():
-    return jsonify({'message': 'Protected route. Access allowed.'})
-
 #aggiungi password contesto
 @app.route('/add-password', methods=['POST'])
 @token_required
@@ -182,23 +176,110 @@ def get_all_contexts():
             return passwords_list
     return jsonify({'message': 'Nessun contesto salvato per l\'utente corrente'}), 400
 
-#ottieni la password tramite id
-@app.route('/get-password/<int:id>', methods=['GET'])
+#ottieni la password tramite id (richiesta esplicitamente la password di autenticazione)
+@app.route('/get-password/<int:id>', methods=['POST'])
 @token_required
 def get_password(id):
-       
+
+    data = request.get_json()
+    if not data['password']:
+        return jsonify({'message': 'Authentication password required'}), 400
+
+    token = session.get('token')
+    password_body = data['password']
+    try:
+        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'])
+        user_info = payload['user']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'message': 'Token has expired!'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'message': 'Token is invalid!'}), 401
+    
+    user_db_row = connect_db(db).execute(f"SELECT * FROM users WHERE username = '{user_info['username']}'").fetchone()
+    
+    if user_db_row:
+        if bcrypt.checkpw(password_body.encode('utf-8'), user_db_row['password']):
+            conn = connect_db(db)
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM passwords WHERE id = ?', (id,))
+            row = cursor.fetchone()
+            if row:
+                decrypted_password = cipher_suite.decrypt(row[4]).decode()
+                password_obj = {
+                    'password': decrypted_password,
+                    }
+                conn.close()
+                return password_obj
+            return jsonify({'message': 'User password not found'}), 400
+        return jsonify({'message': 'Wrong password'}), 400
+    return jsonify({'message': 'User not found!'}), 400
+
+
+#ottieni il singolo contesto e visualizza la password per l'edit
+@app.route('/get-context/<int:id>', methods=['POST'])
+@token_required
+def get_context(id):
+
+    data = request.get_json()
+    if not data['password']:
+        return jsonify({'message': 'Authentication password required'}), 400
+
+    token = session.get('token')
+    password_body = data['password']
+    try:
+        payload = jwt.decode(token, app.secret_key, algorithms=['HS256'])
+        user_info = payload['user']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'message': 'Token has expired!'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'message': 'Token is invalid!'}), 401
+    
+    user_db_row = connect_db(db).execute(f"SELECT * FROM users WHERE username = '{user_info['username']}'").fetchone()
+    
+    if user_db_row:
+        if bcrypt.checkpw(password_body.encode('utf-8'), user_db_row['password']):
+            conn = connect_db(db)
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM passwords WHERE id = ?', (id,))
+            row = cursor.fetchone()
+            if row:
+                decrypted_password = cipher_suite.decrypt(row[4]).decode()
+                context_obj = {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'context': row[2],
+                    'username': row[3],
+                    'password': decrypted_password
+                    }
+                conn.close()
+                return context_obj
+            return jsonify({'message': 'User password not found'}), 400
+        return jsonify({'message': 'Wrong password'}), 400
+    return jsonify({'message': 'User not found!'}), 400
+
+#modifica il contesto
+@app.route('/edit-context/<int:id>', methods=['PUT'])
+@token_required
+def edit_context(id):
+
+    data = request.get_json()
+    if not data['context'] or not data['username'] or not data['password']:
+        return jsonify({'message': 'Mandatory data missing'}), 400
+            
+    context_body = data['context']
+    username_body = data['username']
+    password_body = data['password']
+    encrypted_password = cipher_suite.encrypt(password_body.encode())
+
     conn = connect_db(db)
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM passwords WHERE id = ?', (id,))
-    row = cursor.fetchone()
-    if row:
-        decrypted_password = cipher_suite.decrypt(row[4]).decode()
-        password_obj = {
-            'password': decrypted_password,
-            }
-        conn.close()
-        return password_obj
-    return jsonify({'message': 'User password not found'}), 400
+    query = "UPDATE passwords SET context = ?, username = ?, password = ? WHERE id = ?"
+    data = (context_body, username_body, encrypted_password, id, )
+    
+    cursor.execute(query, data)
+    conn.commit()
+    return jsonify({'message': 'Password added correctly.'})
+
 
 #logout
 @app.route('/logout', methods=['POST'])
