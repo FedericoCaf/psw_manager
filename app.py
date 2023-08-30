@@ -31,8 +31,6 @@ if crypto_key is None:
 db = 'psw_manager_db.db'
 cipher_suite = Fernet(crypto_key)
 
-# THIS IS A COMMENT
-
 #home
 @app.route("/")
 def index():
