@@ -1,4 +1,5 @@
 import os
+import uuid
 import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, render_template, session
@@ -9,9 +10,20 @@ from db_connection import connect_db
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY')
-app.crypto_key = os.environ.get('CRYPTO_KEY') 
+crypto_key = os.environ.get('CRYPTO_KEY')
+if app.secret_key is None:
+    app.secret_key = uuid.uuid4().hex
+    print(app.secret_key)
+    with open('.env', 'a') as env_file:
+        env_file.write(f'export SECRET_KEY="{app.secret_key}"\n')
+
+if crypto_key is None:
+    crypto_key = Fernet.generate_key().decode()
+    with open('.env', 'a') as env_file:
+        env_file.write(f'export CRYPTO_KEY="{crypto_key}"\n')
+
 db = 'psw_manager_db.db'
-cipher_suite = Fernet(app.crypto_key)
+cipher_suite = Fernet(crypto_key)
 
 #home
 @app.route("/")
@@ -84,7 +96,7 @@ def login():
             session['token'] = token
 
             return jsonify({'token': token})
-        return jsonify({'message': 'Invalid credentials'}), 4011
+        return jsonify({'message': 'Invalid credentials'}), 401
     if request.method == 'GET':
         return jsonify({'message': 'Eventuali dati per pagina di login'})
 
