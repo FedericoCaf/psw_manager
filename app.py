@@ -2,18 +2,18 @@ import os
 import uuid
 import datetime
 from functools import wraps
-from flask import Flask, request, jsonify, render_template, session
+from flask import Flask, request, jsonify, session
 from cryptography.fernet import Fernet
 import jwt
 import bcrypt
 from db_connection import connect_db
+from validation_utils import is_valid_email, is_valid_username, is_valid_password
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY')
 crypto_key = os.environ.get('CRYPTO_KEY')
 if app.secret_key is None:
     app.secret_key = uuid.uuid4().hex
-    print(app.secret_key)
     with open('.env', 'a') as env_file:
         env_file.write(f'export SECRET_KEY="{app.secret_key}"\n')
 
@@ -28,18 +28,29 @@ cipher_suite = Fernet(crypto_key)
 #home
 @app.route("/")
 def index():
-    users = connect_db(db).execute('SELECT * FROM users').fetchall()
+    # users = connect_db(db).execute('SELECT * FROM users').fetchall()
     # connect_db(db).close
-    return render_template('index.html', users=users)
+    return jsonify({'message': 'Home page'})
 
 #registrazione
 @app.route("/register", methods=['GET','POST'])
 def register():
     if request.method == 'POST':
         data = request.get_json()
+
         username_body = data['username']
         email_body = data['email']
         password_body = data['password']
+        
+        if not is_valid_email(email_body):
+            return jsonify({'message': 'Invalid email format'}), 400
+
+        if not is_valid_username(username_body):
+            return jsonify({'message': 'Invalid username format, (letters, numbers and underscore accepted)'}), 400
+
+        if not is_valid_password(password_body):
+            return jsonify({'message': 'Invalid password format (minimum 8 characters)'}), 400
+
         hashed_password = bcrypt.hashpw(password_body.encode('utf-8'), bcrypt.gensalt())
 
         user_by_email = connect_db(db).execute(f"SELECT * FROM users WHERE email = '{email_body}'").fetchone()
@@ -50,7 +61,8 @@ def register():
             return jsonify({'message': 'Username already taken'}), 400
         conn = connect_db(db)
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", (username_body, email_body, hashed_password))
+        current_datetime = datetime.datetime.now()
+        cursor.execute("INSERT INTO users (username, email, password, data_iscrizione) VALUES (?, ?, ?, ?)", (username_body, email_body, hashed_password, current_datetime))
         conn.commit()
         return jsonify({'message': 'User registered successfully'}), 201
     if request.method == 'GET':
@@ -194,6 +206,7 @@ def get_password(id):
 def logout():
     session.pop('token', None)
     return jsonify({'message': 'Logged out successfully'})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
