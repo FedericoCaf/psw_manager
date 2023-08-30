@@ -10,6 +10,11 @@ from db_connection import connect_db
 from validation_utils import is_valid_email, is_valid_username, is_valid_password
 
 app = Flask(__name__)
+
+file_path = os.path.join(app.root_path, '.env')
+with open(file_path, 'w') as file:
+    file.write('')
+
 app.secret_key = os.environ.get('SECRET_KEY')
 crypto_key = os.environ.get('CRYPTO_KEY')
 if app.secret_key is None:
@@ -278,7 +283,7 @@ def edit_context(id):
     
     cursor.execute(query, data)
     conn.commit()
-    return jsonify({'message': 'Password added correctly.'})
+    return jsonify({'message': 'Context updated correctly.'})
 
 
 #logout
