@@ -182,7 +182,7 @@ def get_all_contexts():
     return jsonify({'message': 'Nessun contesto salvato per l\'utente corrente'}), 400
 
 #ottieni la password tramite id (richiesta esplicitamente la password di autenticazione)
-@app.route('/get-password/<int:id>', methods=['POST'])
+@app.route('/password/<int:id>', methods=['POST'])
 @token_required
 def get_password(id):
 
@@ -206,7 +206,7 @@ def get_password(id):
         if bcrypt.checkpw(password_body.encode('utf-8'), user_db_row['password']):
             conn = connect_db(db)
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM passwords WHERE id = ?', (id,))
+            cursor.execute('SELECT * FROM passwords WHERE id = ? and user_id = ?', (id, user_info['id']))
             row = cursor.fetchone()
             if row:
                 decrypted_password = cipher_suite.decrypt(row[4]).decode()
@@ -215,13 +215,13 @@ def get_password(id):
                     }
                 conn.close()
                 return password_obj
-            return jsonify({'message': 'User password not found'}), 400
+            return jsonify({'message': 'Password not found for current user'}), 400
         return jsonify({'message': 'Wrong password'}), 400
     return jsonify({'message': 'User not found!'}), 400
 
 
 #ottieni il singolo contesto e visualizza la password per l'edit
-@app.route('/get-context/<int:id>', methods=['POST'])
+@app.route('/context/<int:id>', methods=['POST'])
 @token_required
 def get_context(id):
 
@@ -245,7 +245,7 @@ def get_context(id):
         if bcrypt.checkpw(password_body.encode('utf-8'), user_db_row['password']):
             conn = connect_db(db)
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM passwords WHERE id = ?', (id,))
+            cursor.execute('SELECT * FROM passwords WHERE id = ? and user_id = ?', (id, user_info['id']))
             row = cursor.fetchone()
             if row:
                 decrypted_password = cipher_suite.decrypt(row[4]).decode()
@@ -258,7 +258,7 @@ def get_context(id):
                     }
                 conn.close()
                 return context_obj
-            return jsonify({'message': 'User password not found'}), 400
+            return jsonify({'message': 'Context not found for current user'}), 400
         return jsonify({'message': 'Wrong password'}), 400
     return jsonify({'message': 'User not found!'}), 400
 
