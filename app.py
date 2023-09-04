@@ -181,7 +181,7 @@ def get_all_contexts():
             return passwords_list
     return jsonify({'message': 'Nessun contesto salvato per l\'utente corrente'}), 400
 
-#ottieni la password tramite id (richiesta esplicitamente la password di autenticazione)
+#ottieni la password tramite id (richiede esplicitamente la password di autenticazione)
 @app.route('/password/<int:id>', methods=['POST'])
 @token_required
 def get_password(id):
@@ -220,7 +220,7 @@ def get_password(id):
     return jsonify({'message': 'User not found!'}), 400
 
 
-#ottieni il singolo contesto e visualizza la password per l'edit
+#ottieni il singolo contesto e visualizza la password per l'edit (richiede esplicitamente la password di autenticazione)
 @app.route('/context/<int:id>', methods=['POST'])
 @token_required
 def get_context(id):
@@ -287,7 +287,7 @@ def edit_context(id):
 
 
 #logout
-@app.route('/logout', methods=['POST'])
+@app.route('/logout', methods=['GET'])
 @token_required
 def logout():
     session.pop('token', None)
