@@ -3,6 +3,7 @@ import uuid
 import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, session
+from flask_cors import CORS
 from cryptography.fernet import Fernet
 import jwt
 import bcrypt
@@ -10,6 +11,7 @@ from db_connection import connect_db
 from validation_utils import is_valid_email, is_valid_username, is_valid_password
 
 app = Flask(__name__)
+CORS(app)
 
 file_path = os.path.join(app.root_path, '.env')
 if not os.path.exists(file_path):
@@ -42,7 +44,9 @@ def index():
 @app.route("/register", methods=['GET','POST'])
 def register():
     if request.method == 'POST':
+     
         data = request.get_json()
+        print(data['username'])
         username_body = data['username']
         email_body = data['email']
         password_body = data['password']
